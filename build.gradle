@@ -1,0 +1,86 @@
+defaultTasks 'clean', 'test', 'aggregate', 'reports'
+
+repositories {
+    mavenCentral()
+}
+
+buildscript {
+  ext {
+    serenityCoreVersion = '3.2.4'
+  }
+
+  repositories {
+    maven {
+      url "https://plugins.gradle.org/m2/"
+    }
+  }
+
+  dependencies {
+    classpath("net.serenity-bdd:serenity-gradle-plugin:${serenityCoreVersion}")
+    classpath("net.serenity-bdd:serenity-single-page-report:${serenityCoreVersion}")
+    classpath("net.serenity-bdd:serenity-json-summary-report:${serenityCoreVersion}")
+  }
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: "net.serenity-bdd.serenity-gradle-plugin"
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+ext {
+    assertJVersion = '3.8.0'
+    browserStackLocalJava = '1.0.6'
+    jacksonCoreAsl = '1.9.13'
+    jacksonMapperAsl = '1.9.13'
+    junitVersion = '4.13.1'
+    logbackVersion = '1.2.10'
+    log4jVersion = '1.2.17'
+    restAssured = '5.0.1'
+    serenityCoreVersion = '3.2.4'
+    serenityCucumberVersion = '3.2.4'
+    slf4jVersion = '1.7.7'
+}
+
+dependencies {
+    implementation "ch.qos.logback:logback-classic:${logbackVersion}"
+    implementation "org.codehaus.jackson:jackson-core-asl:${jacksonCoreAsl}"
+    implementation "org.codehaus.jackson:jackson-mapper-asl:${jacksonMapperAsl}"
+    implementation group: 'io.rest-assured', name: 'rest-assured', version: "${restAssured}"
+    implementation group: 'log4j', name: 'log4j', version: "${log4jVersion}"
+
+    implementation "net.serenity-bdd:serenity-core:${serenityCoreVersion}"
+    implementation "net.serenity-bdd:serenity-cucumber:${serenityCucumberVersion}"
+    implementation "net.serenity-bdd:serenity-screenplay:${serenityCoreVersion}"
+    implementation "net.serenity-bdd:serenity-screenplay-webdriver:${serenityCoreVersion}"
+    implementation "net.serenity-bdd:serenity-ensure:${serenityCoreVersion}"
+    implementation "junit:junit:${junitVersion}"
+    implementation "org.assertj:assertj-core:${assertJVersion}"
+}
+
+test {
+    testLogging.showStandardStreams = true
+    systemProperties System.getProperties()
+    systemProperty 'env', project.hasProperty('env') ? project.env : ''
+}
+
+clean {
+    delete "target"
+}
+
+serenity {
+    // Specify the root package of any JUnit acceptance tests to appear in the Serenity report
+    testRoot = "starter"
+
+    // Specify the root directory of any Cucumber feature files
+    requirementsDir = "src/test/resources/features"
+
+    //To generate single page report
+    reports = ['single-page-html','json-summary']
+}
+
+gradle.startParameter.continueOnFailure = true
+
+test.finalizedBy(aggregate)
