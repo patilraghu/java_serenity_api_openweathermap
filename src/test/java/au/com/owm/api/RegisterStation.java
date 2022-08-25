@@ -61,25 +61,25 @@ public class RegisterStation extends PageObject {
     public void verifyResponse(String key, String value) {
         switch(key.toLowerCase()) {
             case "code":
-                assertThat(Integer.parseInt(value)).isEqualTo(registration_response.getStatusLine().getStatusCode());
+                assertThat(registration_response.getStatusLine().getStatusCode()).isEqualTo(Integer.parseInt(value));
                 break;
             case "message":
-                assertThat(value).isEqualTo(responseBody_401.message);
+                assertThat(responseBody_401.message).isEqualTo(value);
                 break;
             case "external_id":
-                assertThat(value).isEqualTo(responseBody_201.external_id);
+                assertThat(responseBody_201.external_id).isEqualTo(value);
                 break;
             case "name":
-                assertThat(value).isEqualTo(responseBody_201.name);
+                assertThat(responseBody_201.name).isEqualTo(value);
                 break;
             case "latitude":
-                assertThat(Double.parseDouble(value)).isEqualTo(responseBody_201.latitude);
+                assertThat(responseBody_201.latitude).isEqualTo(Double.parseDouble(value));
                 break;
             case "longitude":
-                assertThat(Double.parseDouble(value)).isEqualTo(responseBody_201.longitude);
+                assertThat(responseBody_201.longitude).isEqualTo(Double.parseDouble(value));
                 break;
             case "altitude":
-                assertThat(Integer.parseInt(value)).isEqualTo(responseBody_201.altitude);
+                assertThat(responseBody_201.altitude).isEqualTo(Integer.parseInt(value));
                 break;
             default:
                 Assert.fail("Invalid Key " + key);
