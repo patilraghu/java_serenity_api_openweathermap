@@ -1,6 +1,6 @@
 # API Testing using Java/Serenity/BDD Framework
 
-Comments...
+To test registering a station to weather map
 
 ### Prerequisites to run test
 * Install Java JDK 8
@@ -9,9 +9,17 @@ Comments...
 * Set Paths if command not found
 
 ### How to run test
-* Go to project root directory and run following
-* gradle clean test aggregate //To run all tests
-* gradle clean test aggregate -Dcucumber.filter.tags="@negative" // To run specific test
+* Go to project root directory and run following. (either ./gradlew or ./gradlew.bat)
+* ./gradlew clean test aggregate reports // To run all test
+* ./gradlew clean test aggregate reports "-Dcucumber.filter.tags=@positive" // To run specific test
+
+### Continuous Testing Pipeline
+* Azure : Use azure-testing_pipelines.yml to create pipeline and run test
+* AWS   : Use aws_cloudformation_testing.template to create pipeline and run test
 
 ### Test report
-* Open index.html from project root/target/site/serenity folder in browser
+* Refer to  <project root>/target/site/serenity/index.html            - For Detailed report
+![Tag report](./.README/detailed_report.PNG)
+
+* Refer to  <project root>/target/site/serenity/serenity-summary.html - For Single Page report
+![Tag report](./.README/single_page_report.PNG)

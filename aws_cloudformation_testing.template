@@ -1,0 +1,271 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'API testing Pipeline'
+
+Parameters:
+  # Git Repo Branches
+  CodeCommitBranchTest:
+    Description: The CodeCommit Branch for the test environment
+    Type: String
+    Default: "main"
+  ApplicationName:
+    Description: The name of the application that is being deployed
+    Type: String
+    AllowedValues:
+      - java-api-testing
+  CodeCommitRepository:
+    Description: The name of the code commit repository
+    Type: String
+    Default: java_serenity_api_openweathermap
+  DailyEventRuleCron:
+    Description: Cron Expression to schedule Code Pipeline.
+    Type: String
+    Default: "cron(0 1 * * ? *)"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: "CodeCommit Repository"
+        Parameters:
+          - CodeCommitRepository
+      - Label: "Git Repository Branches"
+        Parameters:
+          - CodeCommitBranchTest
+
+Mappings:
+  AWSAccounts:
+    ControlPlane:
+      AccountId: "<Account ID>"
+    TEST:
+      AccountId: "<Account ID>"
+      CodePipelineIAMRole: "arn:aws:iam::<Account ID>:role/CodePipelineCrossAccountRole"
+      CloudFormationIAMRole: "arn:aws:iam::<Account ID>:role/CodePipelineCloudFormationDeployRole"
+      TestEnvironment: "TEST"
+
+Resources:
+  # ---------------------------------------------------------------------------
+  #                             IAM Roles
+  #----------------------------------------------------------------------------
+  # IAM for CloudWatch CodePipeline Invocation
+  #----------------------------------------------------------------------------
+  AmazonCloudWatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub integration-${ApplicationName}-cwe-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource:
+                  - !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${PipelineTest}
+                  - !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref PipelineTest ] ]
+
+  # CloudWatch Events Rule to invoke Repo Template CodePipeline
+  #----------------------------------------------------------------------------
+  AmazonCloudWatchCodeChangeEventRuleTest:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger CodePipeline when code changed
+      Name: !Sub org-${ApplicationName}-code-change-rule-test
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - 'CodeCommit Repository State Change'
+        resources:
+          - !Sub 'arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CodeCommitRepository}'
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - !Ref CodeCommitBranchTest
+      Targets:
+        - Arn:
+            !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref PipelineTest ] ]
+          RoleArn: !GetAtt AmazonCloudWatchEventRole.Arn
+          Id: codepipeline-pipeline
+
+  AmazonCloudWatchDailyTriggerEventRuleTest:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger CodePipeline on Daily basis
+      Name: !Sub org-${ApplicationName}-daily-trigger-rule-test
+      ScheduleExpression: !Ref DailyEventRuleCron
+      State: ENABLED
+      Targets:
+        - Arn:
+            !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref PipelineTest ] ]
+          Id: codepipeline-pipeline
+          RoleArn: !GetAtt AmazonCloudWatchEventRole.Arn
+
+  # IAM Role and policy for CodeBuild
+  #----------------------------------------------------------------------------
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub org-integration-${ApplicationName}-codebuild-role
+      Path: /managed/
+      ManagedPolicyArns:
+        - !Ref CodeBuildPolicy
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  CodeBuildPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: !Sub org-integration-${ApplicationName}-codebuild-policy
+      Path: /managed/
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: WriteLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Sid: AllowAuthToken
+            Effect: Allow
+            Action:
+              - sts:GetServiceBearerToken
+              - codeartifact:GetAuthorizationToken
+            Resource:
+              - "*"
+          - Sid: CodeBuildReports
+            Effect: Allow
+            Action:
+              - codebuild:CreateReportGroup
+              - codebuild:CreateReport
+              - codebuild:UpdateReport
+              - codebuild:BatchPutTestCases
+            Resource:
+              - "*"
+          - Sid: UploadDownloadArtifacts
+            Effect: Allow
+            Action:
+              - s3:Put*
+              - s3:Get*
+            Resource:
+              - !Join ['',['arn:aws:s3:::',!ImportValue IntegrationDeploymentArtifactsBucket, '/*']]
+          - Sid: UseDeploymentEncryptionKey
+            Effect: Allow
+            Action:
+              - kms:*
+            Resource: !ImportValue IntegrationDeploymentKmsEncryptionKey
+
+  #----------------------------------------------------------------------------
+  #                             CodeBuild
+  #----------------------------------------------------------------------------
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub org-integration-${ApplicationName}-build
+      Description: !Sub Confluent Integration  ${ApplicationName}  Build Project
+      EncryptionKey: !ImportValue IntegrationDeploymentKmsEncryptionKey
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: S3Bucket
+            Value: !ImportValue IntegrationDeploymentArtifactsBucket
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                java: corretto8
+              commands:
+                - printenv
+                - ls -R
+                #- INSTALL REQUIREMENTS FOR JAVA
+            # pre_build:
+            #   commands:
+            #     - behave
+            build:
+              commands:
+                - chmod +x gradlew
+                - ./gradlew clean test aggregate reports
+            #artifacts:
+            #  files:
+            #    - 'target/site/serenity/**/*'
+            #  discard-paths: yes
+  #---------------------------------------------------------------------------
+  #                           CodePipeline - TEST
+  #----------------------------------------------------------------------------
+  PipelineTest:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub org-integration-${ApplicationName}-pipeline-test
+      RoleArn: !ImportValue IntegrationPipelineExecutionRole
+      ArtifactStore:
+        Location: !ImportValue IntegrationDeploymentArtifactsBucket
+        Type: S3
+        EncryptionKey:
+          Type: KMS
+          Id: !ImportValue IntegrationDeploymentKmsEncryptionKey
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: CodeCommitRepo
+              RunOrder: 1
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: '1'
+              Configuration:
+                RepositoryName: !Ref CodeCommitRepository
+                BranchName: !Ref CodeCommitBranchTest
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: CloudFormationSource
+        - Name: TestBuild
+          Actions:
+            - Name: Build
+              RunOrder: 1
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+                PrimarySource: CloudFormationSource
+                EnvironmentVariables: !Sub |
+                  [
+                    {"name":"S3Key","value":"org-integration-${ApplicationName}-pipeline-test/codebuild","type":"PLAINTEXT"}
+                  ]
+              InputArtifacts:
+                - Name: CloudFormationSource
+              OutputArtifacts:
+                - Name: BuildOutput

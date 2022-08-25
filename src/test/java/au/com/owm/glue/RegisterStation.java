@@ -17,18 +17,23 @@ public class RegisterStation {
     @After
     public void afterEachScenario(Scenario scenario) {}
 
-    @Given("{string} as {string}")
+    @Given("I like to register a weather station")
+    public void init() {
+
+    }
+
+    @Given("with {string} as {string}")
     public void input(String key, String value) {
         registerStation.inputData(key, value);
     }
 
 
-    @When("Payload posted without API key")
-    public void postPayloadWithoutApiID() {
-        registerStation.postPayloadWithoutApiID();
+    @When("I post the payload with {string} API ID")
+    public void postPayload(String type) {
+        registerStation.postPayload(type);
     }
 
-    @Given("{string} is {string}")
+    @Given("I get {string} as {string}")
     public void verifyResponse(String key, String value) {
         registerStation.verifyResponse(key, value);
     }

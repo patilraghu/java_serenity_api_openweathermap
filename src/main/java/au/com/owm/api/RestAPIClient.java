@@ -8,14 +8,12 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.junit.Assert;
 
 import java.net.URI;
-import java.util.HashMap;
 
 public class RestAPIClient {
+
     final private static EnvironmentVariables variables = SystemEnvironmentVariables.createEnvironmentVariables();
 
     public static CloseableHttpResponse postPayload(String url, String api_id, String registrationPayload) {

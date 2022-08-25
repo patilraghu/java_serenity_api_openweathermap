@@ -14,7 +14,7 @@ public class RegisterStation extends ScenarioSteps {
         registerStation.verifyResponse(key, value);
     }
 
-    public void postPayloadWithoutApiID() {
-        registerStation.postPayloadWithoutApiID();
+    public void postPayload(String type) {
+        registerStation.postPayload(type);
     }
 }
