@@ -214,7 +214,7 @@ Resources:
             build:
               commands:
                 - chmod +x gradlew
-                - ./gradlew clean test aggregate reports
+                - ./gradlew clean test aggregate reports "-Dopenweathermap.api_id=<API_ID>"
             #artifacts:
             #  files:
             #    - 'target/site/serenity/**/*'

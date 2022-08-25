@@ -24,12 +24,12 @@ jobs:
       publishJUnitResults: true
       testResultsFiles: '**/TEST-*.xml'
       tasks: 'clean test aggregate reports'
-      options: ''
+      options: '-Dopenweathermap.api_id=<API_ID>'
     condition: and(succeededOrFailed())
 
   - task: PublishBuildArtifacts@1
     displayName: Publish Artifacts
     inputs:
-      pathToPublish: $(Build.SourcesDirectory)/automated_test/target/site/serenity
+      pathToPublish: $(Build.SourcesDirectory)/target/site/serenity
       artifactName: HtmlReport
     condition: succeededOrFailed()
